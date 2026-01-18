@@ -111,22 +111,37 @@ nodemon server.js
 ```
 
 ## API Routes
+```bash
+Auth Routes
 
-{
-  userId: ObjectId,      // reference to User
-  userName: String,
-  email: String,
-  items: [
-    {
-      itemId: ObjectId,  // reference to Item
-      name: String,
-      quantity: Number,
-      amount: Number
-    }
-  ],
-  totalAmount: Number,
-  paymentMethod: String, // "UPI" or "Card"
-  createdAt: Date
-}
+POST /api/auth/signup – Register new user
+
+POST /api/auth/login – Login existing user
+
+User Routes
+
+GET /api/user/me – Get logged-in user details
+
+Item Routes
+
+GET /api/item/ – Get all items
+
+POST /api/item/ – Add new item (shop only)
+
+PATCH /api/item/:id – Update item
+
+DELETE /api/item/:id – Delete item
+
+Payment Routes
+
+POST /api/payment/ – Process payment and update inventory
+
+GET /api/payment/history – Get logged-in user payment history
+
+POST /api/payment/history – Save payment details for user
+
+Shop Analysis Routes
+
+GET /api/shop-analysis – Get total sales, items sold, weekly/monthly revenue, payment split (shop only)
 
 ```
