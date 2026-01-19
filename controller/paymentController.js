@@ -1,37 +1,27 @@
 import Payment from "../models/Payment.js";
 
-export const savePayment = async (req, res) => {
+// Save payment method
+export const addPayment = async (req, res) => {
   try {
-    const {
-      userName,
-      email,
-      paymentMethod,
-      upiNumber,
-      upiId,
-      cardNumber,
-      cvv,
-      expiry,
-      amount,
-    } = req.body;
+    const { paymentMethod, upiNumber, upiId, cardNumber, cvv, expiry, amount } =
+      req.body;
 
-    if (!userName || !email || !paymentMethod || !amount) {
-      return res.status(400).json({ message: "Required fields missing" });
+    const { email, name } = req.user;
+
+    if (!paymentMethod || !amount) {
+      return res.status(400).json({ message: "Missing required fields" });
     }
 
-    // Simple validations
     if (paymentMethod === "UPI" && (!upiNumber || !upiId)) {
-      return res.status(400).json({ message: "UPI details are required" });
+      return res.status(400).json({ message: "UPI details required" });
     }
 
-    if (
-      paymentMethod === "Card" &&
-      (!cardNumber || !cvv || !expiry || cardNumber.length !== 14 || cvv.length !== 3)
-    ) {
-      return res.status(400).json({ message: "Card details invalid" });
+    if (paymentMethod === "Card" && (!cardNumber || !cvv || !expiry)) {
+      return res.status(400).json({ message: "Card details required" });
     }
 
     const payment = await Payment.create({
-      userName,
+      userName: name,
       email,
       paymentMethod,
       upiNumber,
@@ -42,29 +32,29 @@ export const savePayment = async (req, res) => {
       amount,
     });
 
-    res.status(201).json({ message: "Payment details saved", payment });
+    res.status(201).json({
+      success: true,
+      message: "Payment method added",
+      payment,
+    });
   } catch (err) {
     res.status(500).json({ message: err.message });
   }
 };
 
-
+// Get all payments for logged-in user
 export const getPaymentsByUser = async (req, res) => {
   try {
-    const userEmail = req.user.email; // set by auth middleware
+    const userEmail = req.user?.email;
     if (!userEmail) {
-      return res
-        .status(401)
-        .json({ success: false, message: "User not logged in" });
+      return res.status(401).json({ success: false, message: "User not logged in" });
     }
 
     const payments = await Payment.find({ email: userEmail }).sort({ createdAt: -1 });
 
-    return res.status(200).json({ success: true, payments });
+    res.status(200).json({ success: true, payments });
   } catch (err) {
     console.error(err);
-    return res
-      .status(500)
-      .json({ success: false, message: "Failed to fetch payment details" });
+    res.status(500).json({ success: false, message: "Failed to fetch payment details", error: err.message });
   }
 };

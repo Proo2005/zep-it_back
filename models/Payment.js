@@ -6,14 +6,12 @@ const paymentSchema = new mongoose.Schema(
     email: { type: String, required: true },
     paymentMethod: { type: String, enum: ["UPI", "Card"], required: true },
 
-    // For UPI
-    upiNumber: { type: String },
-    upiId: { type: String },
+    upiNumber: String,
+    upiId: String,
 
-    // For Card
-    cardNumber: { type: String },
-    cvv: { type: String },
-    expiry: { type: String },
+    cardNumber: String,
+    cvv: String,
+    expiry: String,
 
     amount: { type: Number, required: true },
   },
