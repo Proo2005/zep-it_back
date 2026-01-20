@@ -20,9 +20,10 @@ connectDB();
 const app = express();
 
 app.use(cors({
-  origin: "https://zep-it-front.vercel.app/", // frontend URL
-  credentials: true, 
+  origin: "https://zep-it-front.vercel.app",
+  credentials: true, // if you’re using cookies
 }));
+
 app.use(express.json());
 
 app.use(express.json());
