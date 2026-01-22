@@ -11,7 +11,7 @@ import paymentHistoryRoutes from "./routes/paymentHistoryRoutes.js";
 import storeRoutes from "./routes/storeRoutes.js";
 import { getShopAnalysis } from "./controller/shopAnalysisController.js";
 import contactRoutes from  "./routes/contactRoutes.js";
-
+import cartRoutes from "./routes/cartRoutes.js";
 
 
 dotenv.config();
@@ -38,6 +38,8 @@ app.use("/api/paymenthistory", paymentHistoryRoutes);
 app.use("/api/shop-analysis", getShopAnalysis);
 app.use("/api/wallet", walletRoutes);
 app.use("/api/contact", contactRoutes);
+app.use("/api/cart", cartRoutes);
+
 
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
