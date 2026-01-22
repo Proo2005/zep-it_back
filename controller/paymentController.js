@@ -1,4 +1,5 @@
 import Payment from "../models/Payment.js";
+import Cart from "../models/Cart.js";
 
 // Save payment method
 export const addPayment = async (req, res) => {
@@ -56,5 +57,48 @@ export const getPaymentsByUser = async (req, res) => {
   } catch (err) {
     console.error(err);
     res.status(500).json({ success: false, message: "Failed to fetch payment details", error: err.message });
+  }
+};
+
+
+
+export const processSharedCartPayment = async (req, res) => {
+  try {
+    const { cartId } = req.body;
+
+    const cart = await Cart.findById(cartId).populate(
+      "items.addedBy",
+      "name email"
+    );
+
+    if (!cart) return res.status(404).json({ message: "Cart not found" });
+
+    const split = {};
+
+    cart.items.forEach((item) => {
+      const userId = item.addedBy._id.toString();
+      const cost = item.price * item.quantity;
+
+      if (!split[userId]) {
+        split[userId] = {
+          user: item.addedBy,
+          total: 0,
+          items: [],
+        };
+      }
+
+      split[userId].total += cost;
+      split[userId].items.push(item);
+    });
+
+    cart.isPaid = true;
+    await cart.save();
+
+    res.json({
+      success: true,
+      split,
+    });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
   }
 };
