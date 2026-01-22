@@ -61,6 +61,46 @@ export const addItem = async (req, res) => {
       amount,
     });
 
+    const customers = await User.find(
+      { type: "customer" },
+      { email: 1, name: 1 }
+    );
+
+    // 📧 SEND EMAIL TO EACH CUSTOMER
+    customers.forEach((user) => {
+      sendEmail(
+        user.email,
+        "🛒 New Item Added on Zep-It",
+        `
+        <div style="font-family:Arial;padding:16px">
+          <h2>Hello ${user.name} 👋</h2>
+
+          <p>A new product is now available:</p>
+
+          <h3>${itemName}</h3>
+          <p>Category: ${category}</p>
+          <p>Price: <strong>₹${amount}</strong></p>
+
+          <a href="https://zep-it.vercel.app"
+             style="display:inline-block;margin-top:12px;
+                    padding:10px 16px;
+                    background:#0C831F;
+                    color:white;
+                    text-decoration:none;
+                    border-radius:6px">
+            View Product
+          </a>
+
+          <p style="margin-top:24px;color:#777">
+            Thanks for shopping with Zep-It 💚
+          </p>
+        </div>
+        `
+      );
+    });
+
+    
+
     res.status(201).json({
       message: "Item added successfully",
       item: newItem,
