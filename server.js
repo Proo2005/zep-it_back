@@ -38,7 +38,7 @@ app.use("/api/paymenthistory", paymentHistoryRoutes);
 app.use("/api/shop-analysis", getShopAnalysis);
 app.use("/api/wallet", walletRoutes);
 app.use("/api/contact", contactRoutes);
-app.use("/api/cart", cartRoutes);
+app.use("/api/cart", require("./routes/cartRoutes"));
 app.use("/api/split", splitRoutes)
 
 const PORT = process.env.PORT || 5000;
