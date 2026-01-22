@@ -1,70 +1,81 @@
-import Cart from "../models/Cart.js";
-import crypto from "crypto";
+const SharedCart = require("../models/SharedCart");
 
-// Create new shared cart
-export const createCart = async (req, res) => {
+// Create shared cart
+exports.createCart = async (req, res) => {
   try {
     const userId = req.user.id;
+    const cartCode = Math.floor(100000 + Math.random() * 900000).toString();
 
-    const cartCode = crypto.randomBytes(4).toString("hex");
-
-    const cart = await Cart.create({
+    const cart = await SharedCart.create({
       cartCode,
       createdBy: userId,
       participants: [userId],
       items: [],
     });
 
-    res.json({
-      cartId: cart._id,
-      shareLink: `${process.env.FRONTEND_URL}/cart/${cartCode}`,
-    });
+    res.json({ cartCode });
   } catch (err) {
-    res.status(500).json({ message: err.message });
+    res.status(500).json({ message: "Error creating cart" });
   }
 };
 
-// Join cart via link
-export const joinCart = async (req, res) => {
+// Get cart by code
+exports.getCart = async (req, res) => {
   try {
-    const userId = req.user.id;
-    const { cartCode } = req.params;
+    const cart = await SharedCart.findOne({ cartCode: req.params.cartCode }).populate("items.addedBy", "name email");
+    if (!cart) return res.status(404).json({ message: "Cart not found" });
+    res.json({ items: cart.items });
+  } catch (err) {
+    res.status(500).json({ message: "Error fetching cart" });
+  }
+};
 
-    const cart = await Cart.findOne({ cartCode });
+// Add item to cart
+exports.addItemToCart = async (req, res) => {
+  try {
+    const { itemId, name, price, quantity } = req.body;
+    const userId = req.user.id;
+
+    const cart = await SharedCart.findOne({ cartCode: req.params.cartCode });
     if (!cart) return res.status(404).json({ message: "Cart not found" });
 
-    if (!cart.participants.includes(userId)) {
-      cart.participants.push(userId);
-      await cart.save();
+    const existing = cart.items.find(item => item.itemId === itemId && item.addedBy.toString() === userId);
+    if (existing) {
+      existing.quantity += quantity;
+    } else {
+      cart.items.push({ itemId, name, price, quantity, addedBy: userId });
     }
 
-    res.json(cart);
+    if (!cart.participants.includes(userId)) cart.participants.push(userId);
+
+    await cart.save();
+    res.json({ message: "Item added successfully" });
   } catch (err) {
-    res.status(500).json({ message: err.message });
+    res.status(500).json({ message: "Error adding item" });
   }
 };
 
-// Add item to shared cart
-export const addItemToCart = async (req, res) => {
+// Remove item from cart
+exports.removeItemFromCart = async (req, res) => {
   try {
+    const { itemId, quantity } = req.body;
     const userId = req.user.id;
-    const { cartCode } = req.params;
-    const { itemId, itemName, price, quantity } = req.body;
 
-    const cart = await Cart.findOne({ cartCode });
+    const cart = await SharedCart.findOne({ cartCode: req.params.cartCode });
     if (!cart) return res.status(404).json({ message: "Cart not found" });
 
-    cart.items.push({
-      itemId,
-      itemName,
-      price,
-      quantity,
-      addedBy: userId,
-    });
+    cart.items = cart.items
+      .map(item => {
+        if (item.itemId === itemId && item.addedBy.toString() === userId) {
+          item.quantity -= quantity;
+        }
+        return item;
+      })
+      .filter(item => item.quantity > 0);
 
     await cart.save();
-    res.json(cart);
+    res.json({ message: "Item updated" });
   } catch (err) {
-    res.status(500).json({ message: err.message });
+    res.status(500).json({ message: "Error removing item" });
   }
 };
