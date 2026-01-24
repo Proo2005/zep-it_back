@@ -2,20 +2,49 @@ import mongoose from "mongoose";
 
 const paymentSchema = new mongoose.Schema(
   {
-    userName: { type: String, required: true },
-    email: { type: String, required: true },
-    paymentMethod: { type: String, enum: ["UPI", "Card"], required: true },
+    user: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      required: true,
+    },
 
-    upiNumber: String,
-    upiId: String,
+    cartCode: {
+      type: String,
+      default: null,
+    },
 
-    cardNumber: String,
-    cvv: String,
-    expiry: String,
+    items: [
+      {
+        itemId: String,
+        name: String,
+        price: Number,
+        quantity: Number,
+        addedBy: {
+          name: String,
+          email: String,
+        },
+      },
+    ],
 
-    amount: { type: Number, required: true },
+    amount: {
+      type: Number,
+      required: true,
+    },
+
+    razorpay: {
+      orderId: String,
+      paymentId: String,
+      signature: String,
+    },
+
+    status: {
+      type: String,
+      enum: ["success", "failed"],
+      default: "success",
+    },
   },
   { timestamps: true }
 );
 
-export default mongoose.model("Payment", paymentSchema);
+const Payment = mongoose.model("Payment", paymentSchema);
+export default Payment;
