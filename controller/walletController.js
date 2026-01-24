@@ -19,7 +19,8 @@ export const createWalletOrder = async (req, res) => {
 export const verifyWalletPayment = async (req, res) => {
   try {
     const { razorpay_payment_id, amount } = req.body;
-    const userId = req.user.id;
+    const userId = req.user._id;
+
 
     let wallet = await Wallet.findOne({ userId });
 
