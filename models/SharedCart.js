@@ -1,22 +1,40 @@
-const mongoose = require("mongoose");
+import mongoose from "mongoose";
+
+const cartItemSchema = new mongoose.Schema({
+  itemId: String,
+  name: String,
+  price: Number,
+  quantity: Number,
+  addedBy: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: "User",
+  },
+});
 
 const sharedCartSchema = new mongoose.Schema(
   {
-    cartCode: { type: String, required: true, unique: true },
-    createdBy: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
-    participants: [{ type: mongoose.Schema.Types.ObjectId, ref: "User" }],
-    items: [
+    cartCode: {
+      type: String,
+      unique: true,
+      required: true,
+    },
+    createdBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+    },
+    items: [cartItemSchema],
+    payments: [
       {
-        itemId: { type: String, required: true },
-        name: String,
-        price: Number,
-        quantity: Number,
-        addedBy: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
+        userId: {
+          type: mongoose.Schema.Types.ObjectId,
+          ref: "User",
+        },
+        amount: Number,
+        paidAt: Date,
       },
     ],
-    isPaid: { type: Boolean, default: false },
   },
   { timestamps: true }
 );
 
-module.exports = mongoose.model("SharedCart", sharedCartSchema);
+export default mongoose.model("SharedCart", sharedCartSchema);
