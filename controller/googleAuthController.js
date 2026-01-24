@@ -1,16 +1,12 @@
-const { OAuth2Client } = require("google-auth-library");
 const User = require("../models/User");
-const { generateToken } = require("../lib/jwt");
+const jwt = require("jsonwebtoken");
+const { OAuth2Client } = require("google-auth-library");
 
 const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 
 exports.googleLogin = async (req, res) => {
   try {
     const { credential } = req.body;
-
-    if (!credential) {
-      return res.status(400).json({ message: "Google credential missing" });
-    }
 
     const ticket = await client.verifyIdToken({
       idToken: credential,
@@ -22,28 +18,26 @@ exports.googleLogin = async (req, res) => {
 
     let user = await User.findOne({ email });
 
-    // If user does not exist → create
     if (!user) {
       user = await User.create({
         name,
         email,
-        type: "customer",
-        password: "GOOGLE_AUTH",
+        authProvider: "google",
         address: {
-          state: "NA",
-          city: "NA",
-          fullAddress: "Google Login",
+          state: "N/A",
+          city: "N/A",
+          fullAddress: "Signed up with Google",
         },
       });
     }
 
-    const token = generateToken({
-      id: user._id,
-      type: user.type,
-    });
+    const token = jwt.sign(
+      { id: user._id, type: user.type },
+      process.env.JWT_SECRET,
+      { expiresIn: "7d" }
+    );
 
     res.status(200).json({
-      success: true,
       token,
       user: {
         id: user._id,
@@ -55,6 +49,6 @@ exports.googleLogin = async (req, res) => {
     });
   } catch (err) {
     console.error(err);
-    res.status(500).json({ message: "Google login failed" });
+    res.status(401).json({ message: "Google authentication failed" });
   }
 };
