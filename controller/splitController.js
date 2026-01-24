@@ -1,52 +1,27 @@
-const Cart = require("../models/Cart");
+import Cart from "../models/Cart.js";
 
-exports.getSplitDetails = async (req, res) => {
+export const getSplit = async (req, res) => {
   try {
-    const { cartCode } = req.params;
-
-    const cart = await Cart.findOne({ cartCode });
-    if (!cart) {
-      return res.status(404).json({ message: "Cart not found" });
-    }
+    const { code } = req.params;
+    const cart = await Cart.findOne({ code }).populate("users", "name email");
+    if (!cart) return res.status(404).json({ success: false, message: "Cart not found" });
 
     const splitMap = {};
-
     cart.items.forEach(item => {
       const userId = item.addedBy.userId.toString();
-
-      if (!splitMap[userId]) {
-        splitMap[userId] = {
-          userId,
-          name: item.addedBy.name,
-          email: item.addedBy.email,
-          items: [],
-          subtotal: 0,
-        };
-      }
-
-      const itemTotal = item.price * item.quantity;
-
-      splitMap[userId].items.push({
-        name: item.name,
-        quantity: item.quantity,
-        price: item.price,
-        total: itemTotal,
-      });
-
-      splitMap[userId].subtotal += itemTotal;
+      if (!splitMap[userId]) splitMap[userId] = 0;
+      splitMap[userId] += item.price * item.quantity;
     });
 
-    const splitDetails = Object.values(splitMap);
+    const result = cart.users.map(user => ({
+      name: user.name,
+      email: user.email,
+      owes: splitMap[user._id.toString()] || 0,
+    }));
 
-    res.json({
-      cartCode,
-      splitDetails,
-      grandTotal: splitDetails.reduce(
-        (sum, u) => sum + u.subtotal,
-        0
-      ),
-    });
+    res.json({ success: true, split: result });
   } catch (err) {
-    res.status(500).json({ message: err.message });
+    console.error(err);
+    res.status(500).json({ success: false });
   }
 };

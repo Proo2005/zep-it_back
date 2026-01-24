@@ -1,81 +1,79 @@
-const SharedCart = require("../models/SharedCart");
+import Cart from "../models/Cart.js";
+import crypto from "crypto";
 
-// Create shared cart
-exports.createCart = async (req, res) => {
+// Generate unique cart code
+const generateCode = () => crypto.randomBytes(3).toString("hex");
+
+export const createCart = async (req, res) => {
   try {
-    const userId = req.user.id;
-    const cartCode = Math.floor(100000 + Math.random() * 900000).toString();
+    const { items } = req.body;
+    const code = generateCode();
+    const user = req.user; // from auth middleware
 
-    const cart = await SharedCart.create({
-      cartCode,
-      createdBy: userId,
-      participants: [userId],
-      items: [],
+    const cart = new Cart({
+      code,
+      items: items.map(item => ({
+        ...item,
+        addedBy: { userId: user._id, name: user.name, email: user.email },
+      })),
+      users: [user._id],
     });
 
-    res.json({ cartCode });
+    await cart.save();
+    res.json({ success: true, code, cart });
   } catch (err) {
-    res.status(500).json({ message: "Error creating cart" });
+    console.error(err);
+    res.status(500).json({ success: false, message: "Error creating cart" });
   }
 };
 
-// Get cart by code
-exports.getCart = async (req, res) => {
+export const joinCart = async (req, res) => {
   try {
-    const cart = await SharedCart.findOne({ cartCode: req.params.cartCode }).populate("items.addedBy", "name email");
-    if (!cart) return res.status(404).json({ message: "Cart not found" });
-    res.json({ items: cart.items });
-  } catch (err) {
-    res.status(500).json({ message: "Error fetching cart" });
-  }
-};
+    const { code } = req.body;
+    const user = req.user;
 
-// Add item to cart
-exports.addItemToCart = async (req, res) => {
-  try {
-    const { itemId, name, price, quantity } = req.body;
-    const userId = req.user.id;
+    const cart = await Cart.findOne({ code });
+    if (!cart) return res.status(404).json({ success: false, message: "Cart not found" });
 
-    const cart = await SharedCart.findOne({ cartCode: req.params.cartCode });
-    if (!cart) return res.status(404).json({ message: "Cart not found" });
-
-    const existing = cart.items.find(item => item.itemId === itemId && item.addedBy.toString() === userId);
-    if (existing) {
-      existing.quantity += quantity;
-    } else {
-      cart.items.push({ itemId, name, price, quantity, addedBy: userId });
+    if (!cart.users.includes(user._id)) {
+      cart.users.push(user._id);
+      await cart.save();
     }
 
-    if (!cart.participants.includes(userId)) cart.participants.push(userId);
-
-    await cart.save();
-    res.json({ message: "Item added successfully" });
+    res.json({ success: true, cart });
   } catch (err) {
-    res.status(500).json({ message: "Error adding item" });
+    console.error(err);
+    res.status(500).json({ success: false });
   }
 };
 
-// Remove item from cart
-exports.removeItemFromCart = async (req, res) => {
+export const getCart = async (req, res) => {
   try {
-    const { itemId, quantity } = req.body;
-    const userId = req.user.id;
-
-    const cart = await SharedCart.findOne({ cartCode: req.params.cartCode });
-    if (!cart) return res.status(404).json({ message: "Cart not found" });
-
-    cart.items = cart.items
-      .map(item => {
-        if (item.itemId === itemId && item.addedBy.toString() === userId) {
-          item.quantity -= quantity;
-        }
-        return item;
-      })
-      .filter(item => item.quantity > 0);
-
-    await cart.save();
-    res.json({ message: "Item updated" });
+    const { code } = req.params;
+    const cart = await Cart.findOne({ code }).populate("users", "name email");
+    if (!cart) return res.status(404).json({ success: false, message: "Cart not found" });
+    res.json(cart);
   } catch (err) {
-    res.status(500).json({ message: "Error removing item" });
+    console.error(err);
+    res.status(500).json({ success: false });
+  }
+};
+
+export const updateItemQuantity = async (req, res) => {
+  try {
+    const { cartCode, itemId, quantity } = req.body;
+    const cart = await Cart.findOne({ code: cartCode });
+    if (!cart) return res.status(404).json({ success: false, message: "Cart not found" });
+
+    const item = cart.items.find(i => i.itemId === itemId);
+    if (!item) return res.status(404).json({ success: false, message: "Item not found" });
+
+    item.quantity = quantity;
+    await cart.save();
+
+    res.json({ success: true, cart });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ success: false });
   }
 };

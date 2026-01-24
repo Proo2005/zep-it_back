@@ -1,54 +1,22 @@
 import mongoose from "mongoose";
 
 const cartItemSchema = new mongoose.Schema({
-  itemId: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: "Item",
-    required: true,
-  },
-
-  itemName: String,
+  itemId: String,
+  name: String,
   price: Number,
-
-  quantity: {
-    type: Number,
-    default: 1,
-  },
-
+  quantity: Number,
   addedBy: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: "User",
-    required: true,
+    userId: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
+    name: String,
+    email: String,
   },
 });
 
 const cartSchema = new mongoose.Schema(
   {
-    cartCode: {
-      type: String,
-      unique: true,
-      required: true,
-    },
-
-    createdBy: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "User",
-      required: true,
-    },
-
-    participants: [
-      {
-        type: mongoose.Schema.Types.ObjectId,
-        ref: "User",
-      },
-    ],
-
+    code: { type: String, unique: true },
     items: [cartItemSchema],
-
-    isPaid: {
-      type: Boolean,
-      default: false,
-    },
+    users: [{ type: mongoose.Schema.Types.ObjectId, ref: "User" }],
   },
   { timestamps: true }
 );

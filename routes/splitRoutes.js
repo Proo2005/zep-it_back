@@ -1,8 +1,9 @@
-const express = require("express");
+import express from "express";
+import { getSplit } from "../controller/splitController.js";
+import auth from "../middleware/authMiddleware.js";
+
 const router = express.Router();
-const { getSplitDetails } = require("../controller/splitController");
-const auth = require("../middleware/authMiddleware");
 
-router.get("/:cartCode", auth, getSplitDetails);
+router.get("/:code", auth, getSplit);
 
-module.exports = router;
+export default router;
