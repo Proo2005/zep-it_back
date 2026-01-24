@@ -1,50 +1,48 @@
+import razorpay from "../lib/razorpay.js";
 import Wallet from "../models/Wallet.js";
 
-// GET WALLET
-export const getWallet = async (req, res) => {
+export const createWalletOrder = async (req, res) => {
   try {
-    let wallet = await Wallet.findOne({ userId: req.user.id });
+    const { amount } = req.body;
 
-    if (!wallet) {
-      wallet = await Wallet.create({ userId: req.user.id });
-    }
+    const order = await razorpay.orders.create({
+      amount: amount * 100,
+      currency: "INR",
+    });
 
-    res.json({ success: true, balance: wallet.balance });
+    res.json(order);
   } catch (err) {
-    res.status(500).json({ success: false, message: err.message });
+    res.status(500).json({ message: "Order creation failed" });
   }
 };
 
-// ADD MONEY
-export const addMoney = async (req, res) => {
+export const verifyWalletPayment = async (req, res) => {
   try {
-    const { amount, upiId } = req.body;
+    const { razorpay_payment_id, amount } = req.body;
+    const userId = req.user.id;
 
-    if (!amount || amount <= 0 || !upiId) {
-      return res.status(400).json({ message: "Invalid input" });
-    }
-
-    // Simple UPI validation
-    const upiRegex = /^[\w.-]+@[\w.-]+$/;
-    if (!upiRegex.test(upiId)) {
-      return res.status(400).json({ message: "Invalid UPI ID" });
-    }
-
-    let wallet = await Wallet.findOne({ userId: req.user.id });
+    let wallet = await Wallet.findOne({ userId });
 
     if (!wallet) {
-      wallet = await Wallet.create({ userId: req.user.id });
+      wallet = await Wallet.create({ userId });
     }
 
-    wallet.balance += Number(amount);
+    wallet.balance += amount;
+    wallet.transactions.push({
+      amount,
+      type: "credit",
+      razorpay_payment_id,
+    });
+
     await wallet.save();
 
-    res.json({
-      success: true,
-      message: "Money added successfully",
-      balance: wallet.balance,
-    });
+    res.json({ success: true, balance: wallet.balance });
   } catch (err) {
-    res.status(500).json({ success: false, message: err.message });
+    res.status(500).json({ message: "Payment verification failed" });
   }
+};
+
+export const getWallet = async (req, res) => {
+  const wallet = await Wallet.findOne({ userId: req.user.id });
+  res.json(wallet);
 };
