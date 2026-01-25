@@ -12,7 +12,8 @@ import storeRoutes from "./routes/storeRoutes.js";
 import { getShopAnalysis } from "./controller/shopAnalysisController.js";
 import contactRoutes from  "./routes/contactRoutes.js";
 import cartRoutes from "./routes/cartRoutes.js";
-import splitRoutes from "./routes/splitRoutes.js"
+import splitRoutes from "./routes/splitRoutes.js";
+import driverRoutes from "./routes/driverRoutes.js";
 
 dotenv.config();
 connectDB();
@@ -40,6 +41,8 @@ app.use("/api/wallet", walletRoutes);
 app.use("/api/contact", contactRoutes);
 app.use("/api/cart", cartRoutes);
 app.use("/api/split", splitRoutes);
+app.use("/api/drivers", driverRoutes);
+
 
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
