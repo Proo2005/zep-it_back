@@ -7,20 +7,13 @@ const driverSchema = new mongoose.Schema(
     address: { type: String, required: true },
     city: { type: String, required: true },
     state: { type: String, required: true },
-
     vehicleNumber: { type: String, required: true },
     vehicleType: {
       type: String,
       enum: ["EV", "Petrol"],
       required: true,
     },
-
-    rating: {
-      type: Number,
-      default: 5,
-      min: 1,
-      max: 5,
-    },
+    rating: { type: Number, default: 5 },
   },
   { timestamps: true }
 );
