@@ -11,13 +11,15 @@ export const getDrivers = async (req, res) => {
 
 export const addDriver = async (req, res) => {
   try {
-    console.log("REQ BODY:", req.body);
+    console.log("📥 BODY:", req.body);
 
     const driver = await Driver.create(req.body);
 
+    console.log("✅ SAVED DRIVER:", driver);
+
     res.status(201).json(driver);
   } catch (err) {
-    console.error("SAVE ERROR:", err);
-    res.status(400).json({ error: err.message });
+    console.error("❌ SAVE ERROR:", err.message);
+    res.status(500).json({ error: err.message });
   }
 };
