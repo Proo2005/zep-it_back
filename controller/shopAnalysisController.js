@@ -1,76 +1,66 @@
-import PaymentHistory from "../models/PaymentHistory.js";
+import PaymentHistory from "../models/PaymentHistory.js"; // path to your model
 
-export const getShopAnalysis = async (req, res) => {
+
+export const getShopAnalysis = async () => {
   try {
-
-    
-    const now = new Date();
-
-    // ---- TOTAL SALES ----
-    const totalStats = await PaymentHistory.aggregate([
-      {
-        $group: {
-          _id: null,
-          totalRevenue: { $sum: "$totalAmount" },
-          totalOrders: { $sum: 1 }
-        }
-      }
+    // Total Revenue
+    const totalRevenueAgg = await PaymentHistory.aggregate([
+      { $group: { _id: null, totalRevenue: { $sum: "$totalAmount" }, totalOrders: { $sum: 1 } } },
     ]);
+    const totalRevenue = totalRevenueAgg[0]?.totalRevenue || 0;
+    const totalOrders = totalRevenueAgg[0]?.totalOrders || 0;
 
-    // ---- TOTAL ITEMS SOLD ----
-    const itemsSold = await PaymentHistory.aggregate([
+    // Total Items Sold
+    const totalItemsSoldAgg = await PaymentHistory.aggregate([
       { $unwind: "$items" },
-      {
-        $group: {
-          _id: null,
-          totalQuantity: { $sum: "$items.quantity" }
-        }
-      }
+      { $group: { _id: null, totalItemsSold: { $sum: "$items.quantity" } } },
     ]);
+    const totalItemsSold = totalItemsSoldAgg[0]?.totalItemsSold || 0;
 
-    // ---- PAYMENT METHOD SPLIT ----
+    // Payment Method Split
     const paymentSplit = await PaymentHistory.aggregate([
-      {
-        $group: {
-          _id: "$paymentMethod",
-          amount: { $sum: "$totalAmount" }
-        }
-      }
+      { $group: { _id: "$paymentMethod", amount: { $sum: "$totalAmount" } } },
     ]);
 
-    // ---- WEEKLY SALES ----
+    // Weekly Sales Trend (last 8 weeks)
     const weekly = await PaymentHistory.aggregate([
       {
         $group: {
-          _id: { $week: "$createdAt" },
-          total: { $sum: "$totalAmount" }
-        }
+          _id: { $isoWeek: "$createdAt" },
+          total: { $sum: "$totalAmount" },
+        },
       },
-      { $sort: { _id: 1 } }
+      { $sort: { "_id": 1 } },
     ]);
 
-    // ---- MONTHLY SALES ----
+    // Monthly Sales Trend (last 12 months)
     const monthly = await PaymentHistory.aggregate([
       {
         $group: {
           _id: { $month: "$createdAt" },
-          total: { $sum: "$totalAmount" }
-        }
+          total: { $sum: "$totalAmount" },
+        },
       },
-      { $sort: { _id: 1 } }
+      { $sort: { "_id": 1 } },
     ]);
 
-    res.json({
-      success: true,
-      totalRevenue: totalStats[0]?.totalRevenue || 0,
-      totalOrders: totalStats[0]?.totalOrders || 0,
-      totalItemsSold: itemsSold[0]?.totalQuantity || 0,
+    return {
+      totalRevenue,
+      totalOrders,
+      totalItemsSold,
       paymentSplit,
       weekly,
-      monthly
-    });
+      monthly,
+    };
   } catch (err) {
-    console.error(err);
-    res.status(500).json({ success: false, message: "Analysis failed" });
+    console.error("Shop analysis error:", err);
+    return {
+      totalRevenue: 0,
+      totalOrders: 0,
+      totalItemsSold: 0,
+      paymentSplit: [],
+      weekly: [],
+      monthly: [],
+    };
   }
 };
