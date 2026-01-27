@@ -101,6 +101,7 @@ exports.login = async (req, res) => {
         address: user.address,
       },
     });
+
   } catch (error) {
     console.error(error);
     res.status(500).json({ message: "Server error" });
