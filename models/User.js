@@ -16,21 +16,37 @@ const userSchema = new mongoose.Schema(
       trim: true,
     },
 
+    username: {
+      type: String,
+      required: true,
+      unique: true,
+      trim: true,
+    },
+
+    phone: {
+      type: String,
+      required: true,
+      unique: true,
+      trim: true,
+    },
+
     type: {
       type: String,
-      enum: ["customer", "shop"],
+      enum: ["customer", "shop","admin"],
       default: "customer",
     },
 
     password: {
       type: String,
-      required: false, // 🔥 IMPORTANT
+      required: function () {
+        return this.authProvider === "local";
+      },
     },
 
     address: {
-      state: { type: String, default: "N/A" },
-      city: { type: String, default: "N/A" },
-      fullAddress: { type: String, default: "N/A" },
+      state: { type: String, required: true },
+      city: { type: String, required: true },
+      fullAddress: { type: String, required: true },
     },
 
     authProvider: {

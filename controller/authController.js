@@ -2,12 +2,14 @@ const User = require("../models/User");
 const bcrypt = require("bcryptjs");
 const { generateToken } = require("../lib/jwt");
 
-// SIGNUP
+// ================== SIGNUP ==================
 exports.signup = async (req, res) => {
   try {
     const {
       name,
       email,
+      username,
+      phone,
       type,
       password,
       state,
@@ -15,9 +17,12 @@ exports.signup = async (req, res) => {
       fullAddress,
     } = req.body;
 
+    // 🔴 REQUIRED FIELD CHECK
     if (
       !name ||
       !email ||
+      !username ||
+      !phone ||
       !type ||
       !password ||
       !state ||
@@ -27,9 +32,15 @@ exports.signup = async (req, res) => {
       return res.status(400).json({ message: "All fields are required" });
     }
 
-    const existingUser = await User.findOne({ email });
+    // 🔴 DUPLICATE CHECK (email / username / phone)
+    const existingUser = await User.findOne({
+      $or: [{ email }, { username }, { phone }],
+    });
+
     if (existingUser) {
-      return res.status(400).json({ message: "User already exists" });
+      return res.status(400).json({
+        message: "Email, username, or phone already exists",
+      });
     }
 
     const hashedPassword = await bcrypt.hash(password, 10);
@@ -37,8 +48,11 @@ exports.signup = async (req, res) => {
     await User.create({
       name,
       email,
+      username,
+      phone,
       type,
       password: hashedPassword,
+      authProvider: "local",
       address: {
         state,
         city,
@@ -48,11 +62,12 @@ exports.signup = async (req, res) => {
 
     res.status(201).json({ message: "Signup successful" });
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    console.error(error);
+    res.status(500).json({ message: "Server error" });
   }
 };
 
-// LOGIN
+// ================== LOGIN ==================
 exports.login = async (req, res) => {
   try {
     const { email, password } = req.body;
@@ -80,37 +95,50 @@ exports.login = async (req, res) => {
         id: user._id,
         name: user.name,
         email: user.email,
+        username: user.username,
+        phone: user.phone,
         type: user.type,
         address: user.address,
       },
     });
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    console.error(error);
+    res.status(500).json({ message: "Server error" });
   }
 };
 
-
+// ================== VERIFY PASSWORD ==================
 exports.verifyPassword = async (req, res) => {
   try {
     const { email, password } = req.body;
 
     if (!email || !password) {
-      return res.status(400).json({ success: false, message: "Email and password required" });
+      return res
+        .status(400)
+        .json({ success: false, message: "Email and password required" });
     }
 
     const user = await User.findOne({ email });
     if (!user) {
-      return res.status(401).json({ success: false, message: "User not found" });
+      return res
+        .status(401)
+        .json({ success: false, message: "User not found" });
     }
 
     const isMatch = await bcrypt.compare(password, user.password);
     if (!isMatch) {
-      return res.status(401).json({ success: false, message: "Incorrect password" });
+      return res
+        .status(401)
+        .json({ success: false, message: "Incorrect password" });
     }
 
-    return res.status(200).json({ success: true, message: "Password verified" });
+    return res
+      .status(200)
+      .json({ success: true, message: "Password verified" });
   } catch (err) {
     console.error(err);
-    return res.status(500).json({ success: false, message: "Server error" });
+    return res
+      .status(500)
+      .json({ success: false, message: "Server error" });
   }
 };
