@@ -8,8 +8,6 @@ exports.signup = async (req, res) => {
     const {
       name,
       email,
-      username,
-      phone,
       type,
       password,
       state,
@@ -20,8 +18,6 @@ exports.signup = async (req, res) => {
     if (
       !name ||
       !email ||
-      !username ||
-      !phone ||
       !type ||
       !password ||
       !state ||
@@ -41,8 +37,6 @@ exports.signup = async (req, res) => {
     await User.create({
       name,
       email,
-      username,
-      phone,
       type,
       password: hashedPassword,
       address: {
@@ -86,8 +80,6 @@ exports.login = async (req, res) => {
         id: user._id,
         name: user.name,
         email: user.email,
-        username: user.username,
-        phone :user.phone,
         type: user.type,
         address: user.address,
       },
