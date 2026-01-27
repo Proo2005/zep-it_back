@@ -16,39 +16,41 @@ const userSchema = new mongoose.Schema(
       trim: true,
     },
 
-    username : {
-      type :String ,
-      required :true,
-      trim:true,
+    username: {
+      type: String,
+      required: true,
+      unique: true,
+      trim: true,
     },
-    
-    phone :{
-      type :String,
-      required : true,
-      trim:true,
+
+    phone: {
+      type: String,
+      required: true,
+      unique: true,
+      trim: true,
     },
 
     type: {
       type: String,
       enum: ["customer", "shop"],
-      default: "customer",
+      required: true,
     },
 
     password: {
       type: String,
-      required: false, // 🔥 IMPORTANT
+      required: true, // ✅ REQUIRED
     },
 
     address: {
-      state: { type: String, default: "N/A" },
-      city: { type: String, default: "N/A" },
-      fullAddress: { type: String, default: "N/A" },
+      state: { type: String, required: true },
+      city: { type: String, required: true },
+      fullAddress: { type: String, required: true },
     },
 
     authProvider: {
       type: String,
       enum: ["local", "google"],
-      default: "local",
+      required: true,
     },
   },
   { timestamps: true }
