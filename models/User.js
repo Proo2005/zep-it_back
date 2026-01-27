@@ -16,6 +16,18 @@ const userSchema = new mongoose.Schema(
       trim: true,
     },
 
+    username : {
+      type :String ,
+      required :true,
+      trim:true,
+    },
+    
+    phone :{
+      type :String,
+      required : true,
+      trim:true,
+    },
+
     type: {
       type: String,
       enum: ["customer", "shop"],
