@@ -19,9 +19,21 @@ exports.googleLogin = async (req, res) => {
     let user = await User.findOne({ email });
 
     if (!user) {
+      // 🔹 auto-generate username
+      const baseUsername = email.split("@")[0];
+      let username = baseUsername;
+      let count = 1;
+
+      while (await User.findOne({ username })) {
+        username = `${baseUsername}${count++}`;
+      }
+
       user = await User.create({
         name,
         email,
+        username,
+        phone: "0000000000", // 🔹 placeholder
+        type: "customer",
         authProvider: "google",
         address: {
           state: "N/A",
@@ -43,6 +55,8 @@ exports.googleLogin = async (req, res) => {
         id: user._id,
         name: user.name,
         email: user.email,
+        username: user.username,
+        phone: user.phone,
         type: user.type,
         address: user.address,
       },
