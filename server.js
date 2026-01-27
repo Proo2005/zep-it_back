@@ -14,7 +14,7 @@ import contactRoutes from  "./routes/contactRoutes.js";
 import cartRoutes from "./routes/cartRoutes.js";
 import splitRoutes from "./routes/splitRoutes.js";
 import driverRoutes from "./routes/driverRoutes.js";
-import twoFARoutes from "./routes/2faRoutes.js";
+import twoFactorRoutes from "./routes/twoFactorRoutes.js";
 
 
 dotenv.config();
@@ -44,7 +44,8 @@ app.use("/api/contact", contactRoutes);
 app.use("/api/cart", cartRoutes);
 app.use("/api/split", splitRoutes);
 app.use("/api/drivers", driverRoutes);
-app.use("/api/2fa", twoFARoutes);
+app.use("/api/2fa", twoFactorRoutes);
+
 
 
 const PORT = process.env.PORT || 5000;
