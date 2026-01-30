@@ -41,6 +41,28 @@ export const verifyPayment = async (req, res) => {
       return res.status(400).json({ message: "Invalid signature" });
     }
 
+
+    //  STOCK UPDATE 
+    for (const cartItem of cart) {
+      const item = await Item.findById(cartItem.itemId);
+
+      if (!item) {
+        return res.status(404).json({
+          message: `Item not found: ${cartItem.name}`,
+        });
+      }
+
+      if (item.quantity < cartItem.quantity) {
+        return res.status(400).json({
+          message: `Not enough stock for ${cartItem.name}`,
+        });
+      }
+
+      // Deduct stock
+      item.quantity -= cartItem.quantity;
+      await item.save();
+    }
+
     const payment = await Payment.create({
       user: req.user.id,
       cartCode: cartCode || null,
@@ -54,7 +76,11 @@ export const verifyPayment = async (req, res) => {
       status: "success",
     });
 
-    res.json({ success: true, payment });
+    res.json({
+      success: true,
+      message: "Payment successful & stock updated",
+      payment,
+    });
   } catch (err) {
     res.status(500).json({ message: "Payment verification failed" });
   }
