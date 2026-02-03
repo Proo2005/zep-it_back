@@ -2,7 +2,8 @@ import Payment from "../models/Payment.js";
 
 /**
  * GET /api/analysis/shop
- * Shopkeeper / Admin analytics
+ * Shopkeeper → own sales
+ * Admin → full platform sales
  */
 export const getShopAnalysis = async (req, res) => {
   try {
@@ -12,27 +13,32 @@ export const getShopAnalysis = async (req, res) => {
       return res.status(403).json({ message: "Access denied" });
     }
 
-    // Fetch successful payments only
     const payments = await Payment.find({ status: "success" });
 
     let totalRevenue = 0;
     let totalOrders = 0;
     let totalItemsSold = 0;
     const itemMap = {};
-
     const orders = [];
 
     payments.forEach((payment) => {
-      let shopItemCount = 0;
-      let shopAmount = 0;
+      let orderItemCount = 0;
+      let orderAmount = 0;
 
       payment.items.forEach((item) => {
-        if (item.addedBy?.email === user.email) {
-          shopItemCount += item.quantity;
-          shopAmount += item.price * item.quantity;
+        // ✅ ADMIN → count everything
+        const isAdmin = user.type === "admin";
+
+        // ✅ SHOP → count only own items
+        const isShopItem =
+          user.type === "shop" &&
+          item.addedBy?.email === user.email;
+
+        if (isAdmin || isShopItem) {
+          orderItemCount += item.quantity;
+          orderAmount += item.price * item.quantity;
           totalItemsSold += item.quantity;
 
-          // Track top items
           if (!itemMap[item.name]) {
             itemMap[item.name] = 0;
           }
@@ -40,14 +46,15 @@ export const getShopAnalysis = async (req, res) => {
         }
       });
 
-      if (shopItemCount > 0) {
+      // only push order if relevant items exist
+      if (orderItemCount > 0) {
         totalOrders += 1;
-        totalRevenue += shopAmount;
+        totalRevenue += orderAmount;
 
         orders.push({
           _id: payment._id,
-          amount: shopAmount,
-          itemsCount: shopItemCount,
+          amount: orderAmount,
+          itemsCount: orderItemCount,
           status: payment.status,
           createdAt: payment.createdAt,
         });
