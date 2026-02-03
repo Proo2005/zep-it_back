@@ -36,7 +36,7 @@ app.use("/api/store", storeRoutes);
 app.use("/api/auth", authRoutes);
 app.use("/api/user", userRoutes);
 app.use("/api/item", itemRoutes);
-app.use("/api/payment", paymentRoutes);
+app.use("/api/payments", paymentRoutes);
 app.use("/api/paymenthistory", paymentHistoryRoutes);
 app.use("/api/analysis", analysisRoutes);
 app.use("/api/wallet", walletRoutes);

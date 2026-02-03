@@ -117,3 +117,51 @@ export const getPayments = async (req, res) => {
 
   res.json(payments);
 };
+
+
+/**
+ * GET /api/payments/all
+ * Admin → all payments
+ * Shop → payments containing own items
+ */
+export const getAllPayments = async (req, res) => {
+  try {
+    const user = req.user;
+
+    if (!["admin", "shop"].includes(user.type)) {
+      return res.status(403).json({ message: "Access denied" });
+    }
+
+    const payments = await Payment.find({ status: "success" })
+      .sort({ createdAt: -1 })
+      .lean();
+
+    // SHOP → filter only own items
+    const filteredPayments =
+      user.type === "admin"
+        ? payments
+        : payments
+            .map((payment) => {
+              const shopItems = payment.items.filter(
+                (item) => item.addedBy?.email === user.email
+              );
+
+              if (shopItems.length === 0) return null;
+
+              return {
+                ...payment,
+                items: shopItems,
+                amount: shopItems.reduce(
+                  (sum, i) => sum + i.price * i.quantity,
+                  0
+                ),
+              };
+            })
+            .filter(Boolean);
+
+    res.json(filteredPayments);
+  } catch (err) {
+    console.error("Payment fetch error:", err);
+    res.status(500).json({ message: "Failed to load payments" });
+  }
+};
