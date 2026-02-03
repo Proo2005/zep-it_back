@@ -111,13 +111,17 @@ export const verifyPayment = async (req, res) => {
 
 /* ---------------- PAYMENT HISTORY ---------------- */
 export const getPayments = async (req, res) => {
-  const payments = await Payment.find({ user: req.user.id }).sort({
-    createdAt: -1,
-  });
+  try {
+    const payments = await Payment.find({ user: req.user.id }).sort({
+      createdAt: -1,
+    });
 
-  res.json(payments);
+    res.json(payments);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: "Failed to fetch payments" });
+  }
 };
-
 
 /**
  * GET /api/payments/all
