@@ -1,9 +1,6 @@
 import crypto from "crypto";
 import razorpay from "../lib/razorpay.js";
 import Payment from "../models/Payment.js";
-import Item from "../models/Item.js";
-import Cart from "../models/Cart.js";
-import mongoose from "mongoose";
 
 /* ---------------- CREATE ORDER ---------------- */
 export const createOrder = async (req, res) => {
