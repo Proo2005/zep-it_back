@@ -1,6 +1,9 @@
 import crypto from "crypto";
 import razorpay from "../lib/razorpay.js";
 import Payment from "../models/Payment.js";
+import Item from "../models/Item.js";
+import Cart from "../models/Cart.js";
+import mongoose from "mongoose";
 
 /* ---------------- CREATE ORDER ---------------- */
 export const createOrder = async (req, res) => {
@@ -18,8 +21,11 @@ export const createOrder = async (req, res) => {
   }
 };
 
-/* ---------------- VERIFY & SAVE PAYMENT ---------------- */
+/* ---------------- VERIFY PAYMENT + DEDUCT STOCK ---------------- */
 export const verifyPayment = async (req, res) => {
+  const session = await mongoose.startSession();
+  session.startTransaction();
+
   try {
     const {
       razorpay_order_id,
@@ -30,61 +36,78 @@ export const verifyPayment = async (req, res) => {
       cartCode,
     } = req.body;
 
+    // ✅ VERIFY SIGNATURE
     const body = `${razorpay_order_id}|${razorpay_payment_id}`;
-
     const expectedSignature = crypto
       .createHmac("sha256", process.env.RAZORPAY_KEY_SECRET)
       .update(body)
       .digest("hex");
 
     if (expectedSignature !== razorpay_signature) {
+      await session.abortTransaction();
       return res.status(400).json({ message: "Invalid signature" });
     }
 
-
-    //  STOCK UPDATE 
+    // ✅ CHECK STOCK + DEDUCT
     for (const cartItem of cart) {
-      const item = await Item.findById(cartItem.itemId);
+      const item = await Item.findById(cartItem.itemId).session(session);
 
       if (!item) {
-        return res.status(404).json({
-          message: `Item not found: ${cartItem.name}`,
-        });
+        throw new Error(`Item not found: ${cartItem.name}`);
       }
 
       if (item.quantity < cartItem.quantity) {
-        return res.status(400).json({
-          message: `Not enough stock for ${cartItem.name}`,
-        });
+        throw new Error(`Not enough stock for ${cartItem.name}`);
       }
 
-      // Deduct stock
+      // 🔻 deduct stock
       item.quantity -= cartItem.quantity;
-      await item.save();
+      await item.save({ session });
     }
 
-    const payment = await Payment.create({
-      user: req.user.id,
-      cartCode: cartCode || null,
-      items: cart,
-      amount,
-      razorpay: {
-        orderId: razorpay_order_id,
-        paymentId: razorpay_payment_id,
-        signature: razorpay_signature,
-      },
-      status: "success",
-    });
+    // ✅ SAVE PAYMENT RECORD
+    const payment = await Payment.create(
+      [
+        {
+          user: req.user.id,
+          cartCode: cartCode || null,
+          items: cart, // keep as-is
+          amount,
+          razorpay: {
+            orderId: razorpay_order_id,
+            paymentId: razorpay_payment_id,
+            signature: razorpay_signature,
+          },
+          status: "success",
+        },
+      ],
+      { session }
+    );
+
+    // ✅ OPTIONAL: delete cart after payment
+    if (cartCode) {
+      await Cart.findOneAndDelete({ code: cartCode }).session(session);
+    }
+
+    await session.commitTransaction();
 
     res.json({
       success: true,
-      message: "Payment successful & stock updated",
-      payment,
+      message: "Payment successful, stock updated",
+      payment: payment[0],
+      orderId: payment[0]._id,
     });
   } catch (err) {
-    res.status(500).json({ message: "Payment verification failed" });
+    await session.abortTransaction();
+    console.error(err);
+    res.status(500).json({
+      message: err.message || "Payment verification failed",
+    });
+  } finally {
+    session.endSession();
   }
 };
+
 
 /* ---------------- PAYMENT HISTORY ---------------- */
 export const getPayments = async (req, res) => {
