@@ -1,85 +1,63 @@
 import Payment from "../models/Payment.js";
 
 /**
- * GET /api/analysis/shop
- * Shopkeeper → own sales
- * Admin → full platform sales
+ * GET /api/analysis/monthly
+ * Admin → full platform monthly analysis
+ * Shop → own monthly sales
  */
-export const getShopAnalysis = async (req, res) => {
+export const getMonthlyAnalysis = async (req, res) => {
   try {
     const user = req.user;
 
-    if (user.type !== "shop" && user.type !== "admin") {
+    if (!["admin", "shop"].includes(user.type)) {
       return res.status(403).json({ message: "Access denied" });
     }
 
     const payments = await Payment.find({ status: "success" });
 
-    let totalRevenue = 0;
-    let totalOrders = 0;
-    let totalItemsSold = 0;
-    const itemMap = {};
-    const orders = [];
+    const monthlyMap = {};
 
     payments.forEach((payment) => {
-      let orderItemCount = 0;
-      let orderAmount = 0;
+      const monthKey = payment.createdAt.toISOString().slice(0, 7); // YYYY-MM
+
+      let monthRevenue = 0;
+      let monthItems = 0;
 
       payment.items.forEach((item) => {
-        // ✅ ADMIN → count everything
         const isAdmin = user.type === "admin";
-
-        // ✅ SHOP → count only own items
         const isShopItem =
           user.type === "shop" &&
           item.addedBy?.email === user.email;
 
         if (isAdmin || isShopItem) {
-          orderItemCount += item.quantity;
-          orderAmount += item.price * item.quantity;
-          totalItemsSold += item.quantity;
-
-          if (!itemMap[item.name]) {
-            itemMap[item.name] = 0;
-          }
-          itemMap[item.name] += item.quantity;
+          monthRevenue += item.price * item.quantity;
+          monthItems += item.quantity;
         }
       });
 
-      // only push order if relevant items exist
-      if (orderItemCount > 0) {
-        totalOrders += 1;
-        totalRevenue += orderAmount;
+      if (monthRevenue === 0) return;
 
-        orders.push({
-          _id: payment._id,
-          amount: orderAmount,
-          itemsCount: orderItemCount,
-          status: payment.status,
-          createdAt: payment.createdAt,
-        });
+      if (!monthlyMap[monthKey]) {
+        monthlyMap[monthKey] = {
+          month: monthKey,
+          revenue: 0,
+          orders: 0,
+          itemsSold: 0,
+        };
       }
+
+      monthlyMap[monthKey].revenue += monthRevenue;
+      monthlyMap[monthKey].itemsSold += monthItems;
+      monthlyMap[monthKey].orders += 1;
     });
 
-    const topItems = Object.entries(itemMap)
-      .map(([name, quantity]) => ({ name, quantity }))
-      .sort((a, b) => b.quantity - a.quantity)
-      .slice(0, 5);
+    const monthlyStats = Object.values(monthlyMap).sort(
+      (a, b) => a.month.localeCompare(b.month)
+    );
 
-    res.json({
-      summary: {
-        totalRevenue,
-        totalOrders,
-        totalItemsSold,
-        avgOrderValue: totalOrders
-          ? Math.round(totalRevenue / totalOrders)
-          : 0,
-      },
-      orders,
-      topItems,
-    });
+    res.json(monthlyStats);
   } catch (err) {
-    console.error("Shop analysis error:", err);
-    res.status(500).json({ message: "Failed to load shop analytics" });
+    console.error("Monthly analysis error:", err);
+    res.status(500).json({ message: "Failed to load monthly analysis" });
   }
 };
