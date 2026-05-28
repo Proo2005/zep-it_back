@@ -15,7 +15,7 @@ import cartRoutes from "./routes/cartRoutes.js";
 import splitRoutes from "./routes/splitRoutes.js";
 import driverRoutes from "./routes/driverRoutes.js";
 import twoFactorRoutes from "./routes/twoFactorRoutes.js";
-
+import razorpay from "./lib/razorpay.js";
 
 dotenv.config();
 connectDB();
