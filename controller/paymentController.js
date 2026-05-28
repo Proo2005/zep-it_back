@@ -134,18 +134,26 @@ export const verifyPaymentWebhook = async (req, res) => {
 };
 
 /* ---------------- PAYMENT HISTORY ---------------- */
+/* ---------------- PAYMENT HISTORY ---------------- */
 export const getPayments = async (req, res) => {
   try {
+    // Safely extract the ID based on your auth middleware
+    const userId = req.user?.id || req.user?._id;
+
+    if (!userId) {
+      return res.status(401).json({ message: "Unauthorized: User ID missing" });
+    }
+
     const payments = await Payment.find({ 
-      user: req.user.id,
-      status: "success" // Ensure only successful payments are sent to the frontend
+      user: userId,
+      status: "success" // Only send completed payments
     }).sort({
       createdAt: -1,
     });
 
     res.json(payments);
   } catch (err) {
-    console.error(err);
+    console.error("History Fetch Error:", err);
     res.status(500).json({ message: "Failed to fetch payments" });
   }
 };
