@@ -146,10 +146,10 @@ export const getPayments = async (req, res) => {
 
     const payments = await Payment.find({ 
       user: userId,
-      status: "success" // Only send completed payments
+      status: { $in: ["success", "pending"] } // Send both completed and pending payments
     }).sort({
       createdAt: -1,
-    });
+        });
 
     res.json(payments);
   } catch (err) {
