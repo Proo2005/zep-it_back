@@ -6,20 +6,33 @@ import Item from "../models/Item.js";
 import Cart from "../models/Cart.js";
 
 /* ---------------- CREATE ORDER ---------------- */
+/* ---------------- CREATE ORDER (DIAGNOSTIC VERSION) ---------------- */
 export const createOrder = async (req, res) => {
   try {
-    // Receive the cart data from the frontend during initialization
+    console.log("1. Request received. Amount:", req.body.amount);
+    
+    // Check if the auth middleware is attaching the user correctly
+    console.log("2. Auth User Object:", req.user); 
+    
     const { amount, cart, cartCode } = req.body;
 
+    if (!req.user || (!req.user.id && !req.user._id)) {
+        throw new Error("Authentication failure: req.user is undefined or missing an ID.");
+    }
+
+    // Determine the correct user ID field based on your auth middleware
+    const userId = req.user.id || req.user._id;
+
+    console.log("3. Attempting to contact Razorpay...");
     const order = await razorpay.orders.create({
       amount: amount * 100,
       currency: "INR",
     });
+    console.log("4. Razorpay Success! Order ID:", order.id);
 
-    // ✅ SAVE PENDING PAYMENT RECORD
-    // This allows the webhook to access the cart data later without relying on the frontend
+    console.log("5. Attempting to save to MongoDB...");
     await Payment.create({
-      user: req.user.id,
+      user: userId, // Using the safely extracted ID
       cartCode: cartCode || null,
       items: cart, 
       amount,
@@ -28,11 +41,16 @@ export const createOrder = async (req, res) => {
       },
       status: "pending", 
     });
+    console.log("6. MongoDB Save Success!");
 
     res.json(order);
   } catch (err) {
-    console.error("Order creation failed:", err);
-    res.status(500).json({ message: "Order creation failed" });
+    // THIS WILL PRINT THE EXACT REASON FOR THE CRASH
+    console.error("🚨 FATAL CRASH IN CREATE ORDER 🚨");
+    console.error("Error Message:", err.message);
+    if (err.error) console.error("Razorpay Details:", err.error.description);
+    
+    res.status(500).json({ message: "Order creation failed", error: err.message });
   }
 };
 
