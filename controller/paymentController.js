@@ -39,7 +39,7 @@ export const createOrder = async (req, res) => {
       razorpay: {
         orderId: order.id,
       },
-      status: "pending", 
+      status: "success", // Set to pending if you want to wait for webhook confirmation
     });
     console.log("6. MongoDB Save Success!");
 
