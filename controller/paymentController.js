@@ -1,52 +1,81 @@
 import crypto from "crypto";
+import mongoose from "mongoose";
 import razorpay from "../lib/razorpay.js";
 import Payment from "../models/Payment.js";
+import Item from "../models/Item.js";
+import Cart from "../models/Cart.js";
 
 /* ---------------- CREATE ORDER ---------------- */
 export const createOrder = async (req, res) => {
   try {
-    const { amount } = req.body;
+    // Receive the cart data from the frontend during initialization
+    const { amount, cart, cartCode } = req.body;
 
     const order = await razorpay.orders.create({
       amount: amount * 100,
       currency: "INR",
     });
 
+    // ✅ SAVE PENDING PAYMENT RECORD
+    // This allows the webhook to access the cart data later without relying on the frontend
+    await Payment.create({
+      user: req.user.id,
+      cartCode: cartCode || null,
+      items: cart, 
+      amount,
+      razorpay: {
+        orderId: order.id,
+      },
+      status: "pending", 
+    });
+
     res.json(order);
   } catch (err) {
+    console.error("Order creation failed:", err);
     res.status(500).json({ message: "Order creation failed" });
   }
 };
 
-/* ---------------- VERIFY PAYMENT + DEDUCT STOCK ---------------- */
-export const verifyPayment = async (req, res) => {
+/* ---------------- WEBHOOK: VERIFY PAYMENT + DEDUCT STOCK ---------------- */
+export const verifyPaymentWebhook = async (req, res) => {
+  // ✅ 1. VERIFY SIGNATURE (Server-to-Server)
+  const webhookSecret = process.env.RAZORPAY_WEBHOOK_SECRET;
+  const signature = req.headers["x-razorpay-signature"];
+
+  const expectedSignature = crypto
+    .createHmac("sha256", webhookSecret)
+    .update(JSON.stringify(req.body)) // Razorpay requires the raw raw body for verification
+    .digest("hex");
+
+  if (expectedSignature !== signature) {
+    return res.status(400).send("Invalid signature");
+  }
+
+  // ✅ 2. ISOLATE SUCCESSFUL PAYMENTS
+  if (req.body.event !== "payment.captured") {
+    return res.status(200).send("Event ignored");
+  }
+
+  const paymentEntity = req.body.payload.payment.entity;
+  const razorpay_order_id = paymentEntity.order_id;
+  const razorpay_payment_id = paymentEntity.id;
+
   const session = await mongoose.startSession();
   session.startTransaction();
 
   try {
-    const {
-      razorpay_order_id,
-      razorpay_payment_id,
-      razorpay_signature,
-      cart,
-      amount,
-      cartCode,
-    } = req.body;
+    // Retrieve the pending payment generated in createOrder
+    const payment = await Payment.findOne({
+      "razorpay.orderId": razorpay_order_id,
+      status: "pending",
+    }).session(session);
 
-    // ✅ VERIFY SIGNATURE
-    const body = `${razorpay_order_id}|${razorpay_payment_id}`;
-    const expectedSignature = crypto
-      .createHmac("sha256", process.env.RAZORPAY_KEY_SECRET)
-      .update(body)
-      .digest("hex");
-
-    if (expectedSignature !== razorpay_signature) {
-      await session.abortTransaction();
-      return res.status(400).json({ message: "Invalid signature" });
+    if (!payment) {
+      throw new Error("Pending payment not found or already processed");
     }
 
     // ✅ CHECK STOCK + DEDUCT
-    for (const cartItem of cart) {
+    for (const cartItem of payment.items) {
       const item = await Item.findById(cartItem.itemId).session(session);
 
       if (!item) {
@@ -62,54 +91,37 @@ export const verifyPayment = async (req, res) => {
       await item.save({ session });
     }
 
-    // ✅ SAVE PAYMENT RECORD
-    const payment = await Payment.create(
-      [
-        {
-          user: req.user.id,
-          cartCode: cartCode || null,
-          items: cart, // keep as-is
-          amount,
-          razorpay: {
-            orderId: razorpay_order_id,
-            paymentId: razorpay_payment_id,
-            signature: razorpay_signature,
-          },
-          status: "success",
-        },
-      ],
-      { session }
-    );
+    // ✅ UPDATE PAYMENT RECORD TO SUCCESS
+    payment.status = "success";
+    payment.razorpay.paymentId = razorpay_payment_id;
+    payment.razorpay.signature = signature;
+    await payment.save({ session });
 
-    // ✅ OPTIONAL: delete cart after payment
-    if (cartCode) {
-      await Cart.findOneAndDelete({ code: cartCode }).session(session);
+    // ✅ DELETE CART AFTER PAYMENT
+    if (payment.cartCode) {
+      await Cart.findOneAndDelete({ code: payment.cartCode }).session(session);
+    } else {
+      await Cart.findOneAndDelete({ user: payment.user }).session(session);
     }
 
     await session.commitTransaction();
-
-    res.json({
-      success: true,
-      message: "Payment successful, stock updated",
-      payment: payment[0],
-      orderId: payment[0]._id,
-    });
+    res.status(200).send("OK");
   } catch (err) {
     await session.abortTransaction();
-    console.error(err);
-    res.status(500).json({
-      message: err.message || "Payment verification failed",
-    });
+    console.error("Webhook processing failed:", err);
+    res.status(500).send("Internal Server Error");
   } finally {
     session.endSession();
   }
 };
 
-
 /* ---------------- PAYMENT HISTORY ---------------- */
 export const getPayments = async (req, res) => {
   try {
-    const payments = await Payment.find({ user: req.user.id }).sort({
+    const payments = await Payment.find({ 
+      user: req.user.id,
+      status: "success" // Ensure only successful payments are sent to the frontend
+    }).sort({
       createdAt: -1,
     });
 
