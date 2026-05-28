@@ -55,81 +55,71 @@ export const createOrder = async (req, res) => {
 };
 
 /* ---------------- WEBHOOK: VERIFY PAYMENT + DEDUCT STOCK ---------------- */
+/* ---------------- WEBHOOK: VERIFY PAYMENT + DEDUCT STOCK (DIAGNOSTIC) ---------------- */
 export const verifyPaymentWebhook = async (req, res) => {
-  // ✅ 1. VERIFY SIGNATURE (Server-to-Server)
-  const webhookSecret = process.env.RAZORPAY_WEBHOOK_SECRET;
-  const signature = req.headers["x-razorpay-signature"];
-
-  const expectedSignature = crypto
-    .createHmac("sha256", webhookSecret)
-    .update(JSON.stringify(req.body)) // Razorpay requires the raw raw body for verification
-    .digest("hex");
-
-  if (expectedSignature !== signature) {
-    return res.status(400).send("Invalid signature");
-  }
-
-  // ✅ 2. ISOLATE SUCCESSFUL PAYMENTS
-  if (req.body.event !== "payment.captured") {
-    return res.status(200).send("Event ignored");
-  }
-
-  const paymentEntity = req.body.payload.payment.entity;
-  const razorpay_order_id = paymentEntity.order_id;
-  const razorpay_payment_id = paymentEntity.id;
-
-  const session = await mongoose.startSession();
-  session.startTransaction();
-
+  console.log("\n----- 🔔 NEW WEBHOOK RECEIVED -----");
+  
   try {
-    // Retrieve the pending payment generated in createOrder
+    const webhookSecret = process.env.RAZORPAY_WEBHOOK_SECRET;
+    const signature = req.headers["x-razorpay-signature"];
+
+    if (!webhookSecret) {
+      console.error("🚨 ERROR: RAZORPAY_WEBHOOK_SECRET is missing from .env file!");
+      return res.status(500).send("Server config error");
+    }
+
+    console.log("1. Checking Signature...");
+    // Note: If this fails, we may need to use raw body parsing in server.js
+    const expectedSignature = crypto
+      .createHmac("sha256", webhookSecret)
+      .update(JSON.stringify(req.body)) 
+      .digest("hex");
+
+    if (expectedSignature !== signature) {
+      console.error("🚨 ERROR: Signature Mismatch!");
+      console.error("Expected:", expectedSignature);
+      console.error("Received:", signature);
+      return res.status(400).send("Invalid signature");
+    }
+    console.log("✅ Signature Verified!");
+
+    console.log("2. Checking Event Type...");
+    if (req.body.event !== "payment.captured") {
+      console.log(`⚠️ Ignored Event: ${req.body.event}`);
+      return res.status(200).send("Event ignored");
+    }
+    console.log("✅ Event is payment.captured!");
+
+    const paymentEntity = req.body.payload.payment.entity;
+    const razorpay_order_id = paymentEntity.order_id;
+    
+    console.log(`3. Looking for Pending Order ID in DB: ${razorpay_order_id}...`);
+    
+    // Temporarily dropping the 'session' here just in case local MongoDB Replica Sets are causing the crash
     const payment = await Payment.findOne({
       "razorpay.orderId": razorpay_order_id,
       status: "pending",
-    }).session(session);
+    });
 
     if (!payment) {
-      throw new Error("Pending payment not found or already processed");
+      console.error("🚨 ERROR: Pending payment not found in database!");
+      return res.status(404).send("Payment not found");
     }
+    console.log("✅ Pending Order Found in DB!");
 
-    // ✅ CHECK STOCK + DEDUCT
-    for (const cartItem of payment.items) {
-      const item = await Item.findById(cartItem.itemId).session(session);
-
-      if (!item) {
-        throw new Error(`Item not found: ${cartItem.name}`);
-      }
-
-      if (item.quantity < cartItem.quantity) {
-        throw new Error(`Not enough stock for ${cartItem.name}`);
-      }
-
-      // 🔻 deduct stock
-      item.quantity -= cartItem.quantity;
-      await item.save({ session });
-    }
-
-    // ✅ UPDATE PAYMENT RECORD TO SUCCESS
+    console.log("4. Updating Database Status...");
     payment.status = "success";
-    payment.razorpay.paymentId = razorpay_payment_id;
+    payment.razorpay.paymentId = paymentEntity.id;
     payment.razorpay.signature = signature;
-    await payment.save({ session });
+    await payment.save();
+    console.log("✅ Database Updated to Success!");
 
-    // ✅ DELETE CART AFTER PAYMENT
-    if (payment.cartCode) {
-      await Cart.findOneAndDelete({ code: payment.cartCode }).session(session);
-    } else {
-      await Cart.findOneAndDelete({ user: payment.user }).session(session);
-    }
-
-    await session.commitTransaction();
     res.status(200).send("OK");
+    console.log("----- ✅ WEBHOOK COMPLETE -----\n");
+
   } catch (err) {
-    await session.abortTransaction();
-    console.error("Webhook processing failed:", err);
+    console.error("🚨 FATAL WEBHOOK CRASH:", err.message);
     res.status(500).send("Internal Server Error");
-  } finally {
-    session.endSession();
   }
 };
 
